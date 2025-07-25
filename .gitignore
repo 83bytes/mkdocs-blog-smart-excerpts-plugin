@@ -65,3 +65,7 @@ venv.bak/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Claude instructions
+CLAUDE.md
+claude.md
