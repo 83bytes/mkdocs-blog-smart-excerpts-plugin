@@ -1,8 +1,8 @@
 """
-MkDocs Blog Truncate Plugin
+MkDocs Blog Smart Excerpts Plugin
 
-Automatically truncates blog post excerpts after a specified number of lines
-and ensures a "continue reading" link is always shown.
+Automatically creates smart excerpts for blog posts by inserting separators
+after a specified number of lines while preserving full content.
 """
 
 import re
@@ -11,16 +11,16 @@ from mkdocs.plugins import BasePlugin
 from mkdocs.structure.pages import Page
 
 
-class BlogTruncateConfig(config_options.Config):
-    """Configuration options for the blog truncate plugin."""
+class BlogSmartExcerptsConfig(config_options.Config):
+    """Configuration options for the blog smart excerpts plugin."""
 
     max_lines = config_options.Type(int, default=10)
     separator = config_options.Type(str, default="<!-- more -->")
     enable_truncation = config_options.Type(bool, default=True)
 
 
-class BlogTruncatePlugin(BasePlugin[BlogTruncateConfig]):
-    """Plugin to automatically truncate blog post content."""
+class BlogSmartExcerptsPlugin(BasePlugin[BlogSmartExcerptsConfig]):
+    """Plugin to automatically create smart excerpts for blog posts."""
 
     def on_page_markdown(self, markdown, page, config, files):
         """Process page markdown before conversion to HTML."""
@@ -32,7 +32,7 @@ class BlogTruncatePlugin(BasePlugin[BlogTruncateConfig]):
         if not self.config.enable_truncation:
             return markdown
 
-        return self._truncate_markdown(markdown)
+        return self._insert_excerpt_separator(markdown)
 
     def _is_blog_post(self, page):
         """Check if the page is a blog post."""
@@ -43,8 +43,8 @@ class BlogTruncatePlugin(BasePlugin[BlogTruncateConfig]):
         src_path = str(page.file.src_path)
         return "posts/" in src_path and src_path.endswith(".md")
 
-    def _truncate_markdown(self, markdown):
-        """Truncate Markdown content after specified number of lines."""
+    def _insert_excerpt_separator(self, markdown):
+        """Insert separator after specified number of lines at paragraph boundaries."""
 
         separator = self.config.separator
 
@@ -56,11 +56,11 @@ class BlogTruncatePlugin(BasePlugin[BlogTruncateConfig]):
         lines = markdown.split("\n")
         max_lines = self.config.max_lines
 
-        # Skip empty lines and frontmatter for counting
         content_lines = []
         non_empty_count = 0
         in_frontmatter = False
         separator_inserted = False
+        should_insert_separator = False
 
         for i, line in enumerate(lines):
             # Handle frontmatter
@@ -84,18 +84,29 @@ class BlogTruncatePlugin(BasePlugin[BlogTruncateConfig]):
             ):
                 non_empty_count += 1
 
-                # If we've hit our limit and haven't inserted separator yet
+                # Mark that we should insert separator at next paragraph break
                 if non_empty_count >= max_lines and not separator_inserted:
-                    content_lines.append("")  # Add empty line for readability
+                    should_insert_separator = True
+
+            # Insert separator at paragraph boundaries (empty lines or end of content)
+            if should_insert_separator and not separator_inserted:
+                # Check if this is a good place to insert (empty line or next line is empty/end)
+                next_line_empty = (i + 1 >= len(lines) or lines[i + 1].strip() == "")
+                current_line_empty = stripped == ""
+                
+                if current_line_empty or next_line_empty:
+                    if not current_line_empty:
+                        content_lines.append("")  # Add empty line if current isn't empty
                     content_lines.append(separator)
                     separator_inserted = True
-                    # Continue processing remaining lines after separator
-                    content_lines.extend(lines[i + 1 :])
+                    # Add remaining content
+                    content_lines.extend(lines[i + 1:])
                     break
 
-        # If we didn't truncate (short content), still add separator for consistency
-        if non_empty_count < max_lines and not separator_inserted:
-            content_lines.append("")
+        # If we didn't insert separator (short content or no good break point), add at end
+        if not separator_inserted:
+            if content_lines and content_lines[-1].strip() != "":
+                content_lines.append("")
             content_lines.append(separator)
 
         return "\n".join(content_lines)

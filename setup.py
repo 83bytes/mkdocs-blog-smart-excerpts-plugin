@@ -4,13 +4,13 @@ with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setup(
-    name="mkdocs-blog-truncate",
+    name="mkdocs-blog-smart-excerpts",
     version="0.1.0",
-    description="MkDocs plugin to automatically truncate blog posts after specified number of lines",
+    description="MkDocs plugin to automatically create smart excerpts for blog posts by inserting separators",
     long_description=long_description,
     long_description_content_type="text/markdown",
     author="Sohom B",
-    url="https://github.com/83bytes/mkdocs-blog-truncate",
+    url="https://github.com/83bytes/mkdocs-blog-smart-excerpts",
     packages=find_packages(),
     classifiers=[
         "Development Status :: 3 - Alpha",
@@ -30,7 +30,7 @@ setup(
     ],
     entry_points={
         "mkdocs.plugins": [
-            "blog_truncate = mkdocs_blog_truncate.plugin:BlogTruncatePlugin",
+            "blog_smart_excerpts = mkdocs_blog_smart_excerpts.plugin:BlogSmartExcerptsPlugin",
         ]
     },
 )
