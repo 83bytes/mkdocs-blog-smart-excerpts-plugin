@@ -2,6 +2,8 @@
 
 A MkDocs plugin that automatically creates smart excerpts for blog posts by inserting separators into the content. This helps in managing long blog posts by providing a "continue reading" link, enhancing the user experience.
 
+See the [Easier Method: Overriding the Template](#easier-method-overriding-the-template) section at the bottom of this README.
+
 ## Features
 
 - Inserts `<!-- more -->` separator in posts (markdown files) if an existing separator is not already present.
@@ -64,3 +66,90 @@ The plugin hooks into the `on_page_markdown` event and:
 ## License
 
 MIT License
+
+# Easier Method: Overriding the Template
+
+Instead of using this plugin to modify markdown content, you can achieve similar results by overriding the MkDocs Material blog template to prioritize frontmatter excerpts.
+
+## Template Override Approach
+
+1. **Create template override directory structure:**
+   ```
+   your-project/
+   ├── mkdocs.yaml
+   └── overrides/
+       └── partials/
+           └── post.html
+   ```
+
+2. **Enable custom template directory in `mkdocs.yaml`:**
+   ```yaml
+   theme:
+     name: material
+     custom_dir: overrides
+   ```
+
+3. **Create `overrides/partials/post.html` with excerpt logic:**
+   ```html
+   <!-- Post content -->
+   <div class="md-post__content md-typeset">
+     {% if post.meta.excerpt %}
+       <!-- Use custom excerpt from front matter -->
+       {{ post.meta.excerpt }}
+       
+       <!-- Always show continue reading link when using custom excerpt -->
+       <nav class="md-post__action">
+         <a href="{{ post.url | url }}">
+           {{ lang.t("blog.continue") }}
+         </a>
+       </nav>
+     {% else %}
+       <!-- Fallback to auto-truncation logic -->
+       {% set content_lines = post.content.split('\n') %}
+       {% if content_lines|length > 4 %}
+         {% set truncated_content = content_lines[:10]|join('\n') %}
+         {{ truncated_content }}
+         
+         <nav class="md-post__action">
+           <a href="{{ post.url | url }}">
+             {{ lang.t("blog.continue") }}
+           </a>
+         </nav>
+       {% else %}
+         {{ post.content }}
+         
+         {% if post.more %}
+           <nav class="md-post__action">
+             <a href="{{ post.url | url }}">
+               {{ lang.t("blog.continue") }}
+             </a>
+           </nav>
+         {% endif %}
+       {% endif %}
+     {% endif %}
+   </div>
+   ```
+
+4. **Add excerpt to your blog post frontmatter:**
+
+Note: This excerpt will also get added to the top of the blog. It is unclean right now.
+ 
+   ```yaml
+   ---
+   title: My Blog Post
+   excerpt: "This is my custom excerpt that will appear on the blog listing."
+   ---
+   ```
+
+## Benefits of Template Override
+
+- **Simpler**: No plugin installation or complex configuration
+- **Direct control**: Excerpt logic lives in your template
+- **Flexible**: Easy to customize excerpt display and styling
+- **No content modification**: Original markdown remains untouched
+- **Performance**: No additional markdown processing
+
+## When to Use Each Approach
+
+- **Use template override** for simple excerpt needs and direct control
+- **Use this plugin** for automatic separator injection in markdown content and complex excerpt logic
