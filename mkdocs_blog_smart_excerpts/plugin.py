@@ -16,7 +16,8 @@ class BlogSmartExcerptsConfig(config_options.Config):
 
     max_lines = config_options.Type(int, default=10)
     separator = config_options.Type(str, default="<!-- more -->")
-    enable_truncation = config_options.Type(bool, default=True)
+    auto_inject_separator = config_options.Type(bool, default=True)
+    use_frontmatter_excerpt = config_options.Type(bool, default=True)
 
 
 class BlogSmartExcerptsPlugin(BasePlugin[BlogSmartExcerptsConfig]):
@@ -29,7 +30,16 @@ class BlogSmartExcerptsPlugin(BasePlugin[BlogSmartExcerptsConfig]):
         if not self._is_blog_post(page):
             return markdown
 
-        if not self.config.enable_truncation:
+        # Check for front matter excerpt first
+        if (
+            self.config.use_frontmatter_excerpt
+            and hasattr(page, "meta")
+            and page.meta.get("excerpt")
+        ):
+
+            return self._insert_frontmatter_excerpt(markdown, page.meta["excerpt"])
+
+        if not self.config.auto_inject_separator:
             return markdown
 
         return self._insert_excerpt_separator(markdown)
@@ -42,6 +52,39 @@ class BlogSmartExcerptsPlugin(BasePlugin[BlogSmartExcerptsConfig]):
         # Check if the page is in the posts directory
         src_path = str(page.file.src_path)
         return "posts/" in src_path and src_path.endswith(".md")
+
+    def _insert_frontmatter_excerpt(self, markdown, excerpt):
+        """Insert excerpt from front matter with separator."""
+        separator = self.config.separator
+
+        # If separator already exists, don't modify
+        if separator in markdown:
+            return markdown
+
+        # Split front matter from content
+        lines = markdown.split("\n")
+
+        # Look for front matter (first two --- blocks only)
+        if lines and lines[0].strip() == "---":
+            # Find the closing --- for front matter
+            for i in range(1, len(lines)):
+                if lines[i].strip() == "---":  # this is the closing front matter
+                    # Front matter is lines[0:i+1], content is lines[i+1:]
+                    front_matter_lines = lines[0 : i + 1]
+                    content_lines = lines[i + 1 :]
+                    break
+            else:
+                # No closing ---, treat as no front matter
+                front_matter_lines = []
+                content_lines = lines
+        else:
+            # No front matter
+            front_matter_lines = []
+            content_lines = lines
+
+        # Reconstruct with front matter + excerpt + separator + remaining content
+        result_lines = front_matter_lines + ["", excerpt, "", separator] + content_lines
+        return "\n".join(result_lines)
 
     def _insert_excerpt_separator(self, markdown):
         """Insert separator after specified number of lines at paragraph boundaries."""
@@ -91,16 +134,18 @@ class BlogSmartExcerptsPlugin(BasePlugin[BlogSmartExcerptsConfig]):
             # Insert separator at paragraph boundaries (empty lines or end of content)
             if should_insert_separator and not separator_inserted:
                 # Check if this is a good place to insert (empty line or next line is empty/end)
-                next_line_empty = (i + 1 >= len(lines) or lines[i + 1].strip() == "")
+                next_line_empty = i + 1 >= len(lines) or lines[i + 1].strip() == ""
                 current_line_empty = stripped == ""
-                
+
                 if current_line_empty or next_line_empty:
                     if not current_line_empty:
-                        content_lines.append("")  # Add empty line if current isn't empty
+                        content_lines.append(
+                            ""
+                        )  # Add empty line if current isn't empty
                     content_lines.append(separator)
                     separator_inserted = True
                     # Add remaining content
-                    content_lines.extend(lines[i + 1:])
+                    content_lines.extend(lines[i + 1 :])
                     break
 
         # If we didn't insert separator (short content or no good break point), add at end
