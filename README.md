@@ -1,6 +1,6 @@
-# MkDocs Blog Truncate Plugin
+# MkDocs Blog Smart Excerpts Plugin
 
-A MkDocs plugin that automatically inserts a separator in blog posts after a specified number of lines to create excerpts while preserving the full content for individual post pages.
+A MkDocs plugin that automatically inserts a separator in blog posts after a specified number of lines to create smart excerpts while preserving the full content for individual post pages.
 
 ## Features
 
@@ -14,7 +14,7 @@ A MkDocs plugin that automatically inserts a separator in blog posts after a spe
 ## Installation
 
 ```bash
-pip install mkdocs-blog-truncate
+pip install mkdocs-blog-smart-excerpts
 ```
 
 ## Usage
@@ -24,7 +24,7 @@ Add to your `mkdocs.yaml`:
 ```yaml
 plugins:
   - blog  # Material for MkDocs blog plugin
-  - blog_truncate:
+  - blog_smart_excerpts:
       max_lines: 10          # Number of content lines before separator insertion
       enable_truncation: true # Enable/disable the plugin
 ```
