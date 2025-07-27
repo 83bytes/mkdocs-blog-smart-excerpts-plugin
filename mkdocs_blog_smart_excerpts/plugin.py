@@ -5,29 +5,39 @@ Automatically creates smart excerpts for blog posts by inserting separators
 after a specified number of lines while preserving full content.
 """
 
-import re
 from mkdocs.config import config_options
 from mkdocs.plugins import BasePlugin
-from mkdocs.structure.pages import Page
 
 
 class BlogSmartExcerptsConfig(config_options.Config):
     """Configuration options for the blog smart excerpts plugin."""
 
     max_lines = config_options.Type(int, default=10)
-    separator = config_options.Type(str, default="<!-- more -->")
     auto_inject_separator = config_options.Type(bool, default=True)
     use_frontmatter_excerpt = config_options.Type(bool, default=True)
+    verbose = config_options.Type(bool, default=False)
+
+    separator = "<!-- more -->"  # Default separator to use in posts
 
 
 class BlogSmartExcerptsPlugin(BasePlugin[BlogSmartExcerptsConfig]):
     """Plugin to automatically create smart excerpts for blog posts."""
+
+    def _log(self, message):
+        """Log a message if verbose mode is enabled."""
+        if self.config.verbose:
+            print(f"[BlogSmartExcerptsPlugin] {message}")
 
     def on_page_markdown(self, markdown, page, config, files):
         """Process page markdown before conversion to HTML."""
 
         # Only process blog posts (pages in posts directory)
         if not self._is_blog_post(page):
+            self._log(f"Skipping non-blog page: {getattr(page.file, 'src_path', None)}")
+            return markdown
+
+        # If separator already exists, don't modify
+        if self.config.separator in markdown:
             return markdown
 
         # Check for front matter excerpt first
@@ -36,13 +46,21 @@ class BlogSmartExcerptsPlugin(BasePlugin[BlogSmartExcerptsConfig]):
             and hasattr(page, "meta")
             and page.meta.get("excerpt")
         ):
-
+            self._log(
+                f"Inserting frontmatter excerpt for page: {getattr(page.file, 'src_path', None)}"
+            )
             return self._insert_frontmatter_excerpt(markdown, page.meta["excerpt"])
 
-        if not self.config.auto_inject_separator:
-            return markdown
+        if self.config.auto_inject_separator:
+            self._log(
+                f"Auto-injecting excerpt separator for page: {getattr(page.file, 'src_path', None)}"
+            )
+            return self._insert_excerpt_separator(markdown)
 
-        return self._insert_excerpt_separator(markdown)
+        self._log(
+            f"No excerpt or separator injected for page: {getattr(page.file, 'src_path', None)}"
+        )
+        return markdown
 
     def _is_blog_post(self, page):
         """Check if the page is a blog post."""
@@ -51,15 +69,13 @@ class BlogSmartExcerptsPlugin(BasePlugin[BlogSmartExcerptsConfig]):
 
         # Check if the page is in the posts directory
         src_path = str(page.file.src_path)
-        return "posts/" in src_path and src_path.endswith(".md")
+        is_blog = "posts/" in src_path and src_path.endswith(".md")
+        self._log(f"Page src_path: {src_path}, is_blog_post: {is_blog}")
+        return is_blog
 
     def _insert_frontmatter_excerpt(self, markdown, excerpt):
         """Insert excerpt from front matter with separator."""
         separator = self.config.separator
-
-        # If separator already exists, don't modify
-        if separator in markdown:
-            return markdown
 
         # Split front matter from content
         lines = markdown.split("\n")
@@ -75,10 +91,14 @@ class BlogSmartExcerptsPlugin(BasePlugin[BlogSmartExcerptsConfig]):
                     break
             else:
                 # No closing ---, treat as no front matter
+                self._log(
+                    "No closing --- found for front matter; treating as no front matter."
+                )
                 front_matter_lines = []
                 content_lines = lines
         else:
             # No front matter
+            self._log("No front matter detected. Treating everything as content.")
             front_matter_lines = []
             content_lines = lines
 
@@ -90,10 +110,6 @@ class BlogSmartExcerptsPlugin(BasePlugin[BlogSmartExcerptsConfig]):
         """Insert separator after specified number of lines at paragraph boundaries."""
 
         separator = self.config.separator
-
-        # If separator already exists, don't modify
-        if separator in markdown:
-            return markdown
 
         # Split markdown into lines
         lines = markdown.split("\n")
@@ -144,6 +160,9 @@ class BlogSmartExcerptsPlugin(BasePlugin[BlogSmartExcerptsConfig]):
                         )  # Add empty line if current isn't empty
                     content_lines.append(separator)
                     separator_inserted = True
+                    self._log(
+                        f"Inserted separator after {non_empty_count} content lines at line {i}."
+                    )
                     # Add remaining content
                     content_lines.extend(lines[i + 1 :])
                     break
@@ -153,5 +172,6 @@ class BlogSmartExcerptsPlugin(BasePlugin[BlogSmartExcerptsConfig]):
             if content_lines and content_lines[-1].strip() != "":
                 content_lines.append("")
             content_lines.append(separator)
+            self._log("Inserted separator at end of content.")
 
         return "\n".join(content_lines)
